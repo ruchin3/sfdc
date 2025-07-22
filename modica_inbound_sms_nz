@@ -1,3 +1,11 @@
+/*
+Sample code, not intended for production use
+Node.js 22
+Designed to be invoked by AWS API Gateway
+Uses DynamoDB to store ContactId <--> Phone number mapping for outbound SMS
+Ruchin Gupta 22/07/2025
+*/
+
 import { ConnectParticipantClient, CreateParticipantConnectionCommand } from "@aws-sdk/client-connectparticipant"; 
 import { ConnectClient, StartChatContactCommand, StartContactStreamingCommand } from "@aws-sdk/client-connect";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";

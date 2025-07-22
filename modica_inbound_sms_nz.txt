@@ -1,0 +1,206 @@
+import { ConnectParticipantClient, CreateParticipantConnectionCommand } from "@aws-sdk/client-connectparticipant"; 
+import { ConnectClient, StartChatContactCommand, StartContactStreamingCommand } from "@aws-sdk/client-connect";
+import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import { DynamoDBDocumentClient, GetCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
+
+const connectClient = new ConnectClient({});
+const tableName = process.env.tableName;
+const expiryMinutes = process.env.expiryMinutes
+
+const dbClient = new DynamoDBClient({ region: "ap-southeast-2" });
+const docClient = DynamoDBDocumentClient.from(dbClient);
+
+export const handler = async (event) => {
+  const instanceId = process.env.INSTANCE_ID;
+  const contactFlowId = process.env.CONTACT_FLOW_ID;
+  const streamingEndpointArn = process.env.STREAMING_ENDPOINT_ARN;
+
+  const requestData = event['body-json'];
+  console.log(requestData);
+
+  if (!requestData.source) {
+    console.log("Source not provided in request body | Exiting");
+    return {
+      statusCode: 200,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: "Missing source in request body" }),
+    };
+  }
+
+  console.log("Source: " + requestData.source);
+  console.log("Content: " + requestData.content);
+
+  var ddbRecord = await ReadDDBRecord(requestData.source);
+  
+  if (ddbRecord == null) {
+    console.log("No existing conversation record found");
+
+    if (!instanceId || !contactFlowId || !streamingEndpointArn) {
+      console.error("Error: Missing required environment variables INSTANCE_ID, CONTACT_FLOW_ID, or STREAMING_ENDPOINT_ARN.");
+      return {
+        statusCode: 500,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: "Server configuration error." }),
+      };
+    }
+  
+    const chatParams = {
+      InstanceId: instanceId,
+      ContactFlowId: contactFlowId,
+      Attributes: {
+        "country": "NZ"
+      },
+      InitialMessage: {
+        ContentType: "text/plain",
+        Content: requestData.content,
+      },
+      ParticipantDetails: {
+        DisplayName: event.displayName || requestData.source,
+      },
+    };
+  
+    console.log("Attempting to start chat with parameters:", chatParams);
+  
+    try {
+      const startChatCommand = new StartChatContactCommand(chatParams);
+      const chatResponse = await connectClient.send(startChatCommand);
+  
+      console.log("Successfully started chat. Response:", chatResponse);
+      
+      const { ContactId, ParticipantId, ParticipantToken } = chatResponse;
+  
+      console.log(`Attempting to start streaming for ContactId: ${ContactId}`);
+      
+      const streamingParams = {
+          InstanceId: instanceId,
+          ContactId: ContactId,
+          ChatStreamingConfiguration: {
+              StreamingEndpointArn: streamingEndpointArn,
+          },
+      };
+  
+      const startStreamingCommand = new StartContactStreamingCommand(streamingParams);
+      const streamingResponse = await connectClient.send(startStreamingCommand);
+  
+      console.log("Successfully started contact streaming. Response:", streamingResponse);
+  
+      console.log(`Attempting to create participant connection for ParticipantId: ${ParticipantId}`);
+  
+      const connectionParams = {
+          ParticipantToken: ParticipantToken,
+          ConnectParticipant: true,
+          Type: ["CONNECTION_CREDENTIALS"] 
+      };
+  
+      const connectParticipantClient = new ConnectParticipantClient({ region: "ap-southeast-2" });
+  
+      const createConnectionCommand = new CreateParticipantConnectionCommand(connectionParams);
+      const connectionResponse = await connectParticipantClient.send(createConnectionCommand);
+  
+      console.log("Successfully created participant connection. Response:", connectionResponse);
+
+      const ddbResponse = await CreateDDBRecord(requestData.source, ContactId);
+      console.log("Successfully created DDB entry", ddbResponse);
+
+  
+      return {
+        statusCode: 200,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*" 
+        },
+        body: JSON.stringify({
+          message: "Chat, streaming, and connection initiated successfully.",
+          contactId: ContactId,
+          participantId: ParticipantId,
+          participantToken: ParticipantToken, 
+          streamingId: streamingResponse.StreamingId,
+          connectionDetails: {
+              websocket: connectionResponse.Websocket,
+              connectionCredentials: connectionResponse.ConnectionCredentials,
+          }
+        }),
+      };
+    } catch (error) {
+      console.error("Error during contact initiation, streaming, or connection creation:", error);
+  
+      return {
+        statusCode: 500,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*"
+        },
+        body: JSON.stringify({
+          message: "Failed to start chat, stream, or create connection.",
+          error: error.message,
+        }),
+      };
+    }
+
+  }
+  else {
+    console.log("Existing conversation record found");
+  }
+
+
+};
+
+async function ReadDDBRecord(customerNumber) {
+  console.log(`Checking for customerNumber '${customerNumber}'...`);
+
+  const getParams = {
+      TableName: tableName,
+      Key: {
+          customerNumber: customerNumber
+      }
+  };
+  const getCommand = new GetCommand(getParams);
+
+  try {
+      const { Item } = await docClient.send(getCommand);
+
+      if (Item) {
+          console.log(`Success: Customer '${customerNumber}' found.`);
+          return Item;
+       }
+      else {
+          console.log(`Customer '${customerNumber}' not found.`);
+          return null;
+      }
+    } catch (error) {
+      console.error(`An AWS SDK error occurred: ${error.name} - ${error.message}`);
+      return null;
+  }
+}
+
+
+
+async function CreateDDBRecord(customerNumber, contactId) {
+  try {
+      console.log(`Creating new entry for Customer '${customerNumber}'`);
+
+      var expiryDateTime = Date.now() + (expiryMinutes * 60 * 1000);
+      console.log(`Expiry date time: ${expiryDateTime}`);
+      console.log("ExpiryDateTime: " + new Date(expiryDateTime).toISOString());
+
+      const newItem = {
+          customerNumber: customerNumber,
+          contactId: contactId,
+          expiryDateTime: expiryDateTime
+      };
+
+      const putParams = {
+          TableName: tableName,
+          Item: newItem
+      };
+      const putCommand = new PutCommand(putParams);
+      
+      await docClient.send(putCommand);
+      console.log(`Success: New customer '${customerNumber}' created.`);
+      return newItem;
+
+  } catch (error) {
+      console.error(`An AWS SDK error occurred: ${error.name} - ${error.message}`);
+      return null;
+  }
+}

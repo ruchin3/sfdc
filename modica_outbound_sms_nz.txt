@@ -1,0 +1,85 @@
+const apiUser = process.env.API_USER;
+const apiPass = process.env.API_PASS;
+
+export const handler = async (event, context) => {
+
+  console.log(JSON.stringify(event));
+
+  var payload = JSON.parse(event.Records[0].Sns.Message);
+
+  console.log(payload.Content);
+
+  try {
+    //Lookup phone number from ContactId to phone number mapping stored by Inbound_SMS lambda
+    const apiResponseData = await makeApiRequest("+64204005006", payload.Content);
+
+    console.log("Successfully received data from external API.");
+
+    return {
+        statusCode: 200,
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+            message: "Successfully sent POST request!",
+            data: apiResponseData,
+        }),
+    };
+    } catch (error) {
+        console.error("Error making API request:", error);
+
+        return {
+            statusCode: 500,
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                message: "Failed to send POST request to the external API.",
+                error: error.message,
+            }),
+        };
+    }
+
+};
+
+async function makeApiRequest(customerNumber, contentBody) {
+  const postData = JSON.stringify({
+      destination: customerNumber,
+      content: contentBody
+  });
+
+  const username = apiUser;
+  const password = apiPass;
+  const basicAuth = 'Basic ' + Buffer.from(username + ':' + password).toString('base64');
+
+    const url = 'https://api.modicagroup.com/rest/gateway/messages'; 
+    const options = {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': basicAuth
+        },
+        body: postData
+    };
+
+    try {
+        console.log(`Making POST request to ${url}`);
+        const response = await fetch(url, options);
+
+        if (!response.ok) {
+            throw new Error(`API request failed with status ${response.status}: ${response.statusText}`);
+        }
+        
+        const responseText = await response.text();
+
+        if (responseText) {
+            return JSON.parse(responseText);
+        } else {
+            return { message: "Request successful with no response body." };
+        }
+
+    } catch (error) {
+        console.error("Fetch API call failed:", error);
+        throw error;
+    }
+}

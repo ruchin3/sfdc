@@ -1,0 +1,72 @@
+import { ConnectClient, StartOutboundVoiceContactCommand } from "@aws-sdk/client-connect";
+
+const connectClient = new ConnectClient({});
+
+export const handler = async (event) => {
+
+  console.log(event);
+  let jsonRequest = JSON.parse(event.body);
+  const { INSTANCE_ID, CONTACT_FLOW_ID, SOURCE_PHONE_NUMBER } = process.env;
+  const { AgentPhoneNumber, CustomerPhoneNumber } = jsonRequest;
+
+
+  console.log(`AgentPhoneNumber: ${AgentPhoneNumber}`);
+  console.log(`CustomerPhoneNumber: ${CustomerPhoneNumber}`);
+
+  if (!AgentPhoneNumber || !CustomerPhoneNumber) {
+    const missingParams = [
+      !AgentPhoneNumber ? "AgentPhoneNumber" : null,
+      !CustomerPhoneNumber ? "CustomerPhoneNumber" : null,
+    ].filter(Boolean).join(', ');
+
+    console.error(`Validation Error: Missing required parameters: ${missingParams}`);
+    return {
+      statusCode: 400,
+      body: JSON.stringify({ message: `Error: Missing required event parameters: ${missingParams}.` }),
+    };
+  }
+
+  if (!INSTANCE_ID || !CONTACT_FLOW_ID || !SOURCE_PHONE_NUMBER) {
+    console.error("Configuration Error: One or more required environment variables are not set.");
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ message: "Server configuration error. Please check Lambda environment variables." }),
+    };
+  }
+
+  const params = {
+    DestinationPhoneNumber: AgentPhoneNumber,
+    InstanceId: INSTANCE_ID,
+    ContactFlowId: CONTACT_FLOW_ID,
+    SourcePhoneNumber: SOURCE_PHONE_NUMBER,
+    Attributes: {
+      "CustomerPhoneNumber": CustomerPhoneNumber
+    }
+  };
+
+  const command = new StartOutboundVoiceContactCommand(params);
+
+  try {
+    console.log(`Attempting to start agent-first call to agent at ${AgentPhoneNumber} for customer at ${CustomerPhoneNumber}`);
+    const response = await connectClient.send(command);
+    console.log(`Successfully initiated call to agent. ContactId: ${response.ContactId}`);
+
+    return {
+      statusCode: 200,
+      body: JSON.stringify({
+        message: "Call to agent initiated successfully. Waiting for agent to connect to customer.",
+        contactId: response.ContactId,
+      }),
+    };
+  } catch (error) {
+    console.error("Failed to start outbound call:", error);
+    return {
+      statusCode: 500,
+      body: JSON.stringify({
+        message: "Failed to initiate call.",
+        errorName: error.name,
+        errorMessage: error.message,
+      }),
+    };
+  }
+};

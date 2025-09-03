@@ -1,0 +1,324 @@
+//
+
+
+import { request } from 'https';
+import { stringify } from 'querystring';
+const tokenUrl = process.env.TokenUrl;
+const tokenPath = process.env.TokenPath; 
+const clientId = process.env.ClientId;
+const clientSecret = process.env.ClientSecret;
+const agentId = process.env.AgentId;
+import { randomUUID } from 'crypto';
+
+async function makeRequest(options, postData) {
+    return new Promise((resolve, reject) => {
+        const req = request(options, (res) => {
+            let responseBody = '';
+            res.setEncoding('utf8');
+            res.on('data', (chunk) => {
+                responseBody += chunk;
+            });
+            res.on('end', () => {
+                try {
+                    const parsedBody = JSON.parse(responseBody);
+                    if (res.statusCode >= 200 && res.statusCode < 300) {
+                        resolve(parsedBody);
+                    } else {
+                        console.error(`HTTP Error ${res.statusCode}:`, parsedBody);
+                        reject(new Error(`Request failed with status ${res.statusCode}: ${JSON.stringify(parsedBody)}`));
+                    }
+                } catch (error) {
+                    console.error("Failed to parse JSON response:", responseBody);
+                    reject(new Error('Failed to parse response from server.'));
+                }
+            });
+        });
+        req.on('error', (error) => {
+            console.error("Request Error:", error);
+            reject(error);
+        });
+        if (postData) {
+            req.write(postData);
+        }
+        req.end();
+
+
+       
+    }); 
+}
+
+const getSalesforceAccessToken = async () => {
+    console.log("Requesting Salesforce access token...");
+    const tokenRequestData = {
+        grant_type: 'client_credentials',
+        client_id: clientId,
+        client_secret: clientSecret,
+    };
+    const tokenPostData = stringify(tokenRequestData);
+    const tokenOptions = {
+        hostname: tokenUrl,
+        path: tokenPath,
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Content-Length': Buffer.byteLength(tokenPostData),
+        },
+    };
+
+    const tokenResponse = await makeRequest(tokenOptions, tokenPostData);
+    const accessToken = tokenResponse.access_token;
+
+    console.log("AccessToken: " + tokenResponse.access_token);
+
+    if (!accessToken) {
+        console.error("Auth Error: Access token not found in response.", tokenResponse);
+        throw new Error("Access token could not be retrieved from Salesforce.");
+    }
+    console.log("Successfully retrieved access token.");
+    return accessToken;
+};
+
+const createAgentSession = async (accessToken, customerIdentifier) => {
+    console.log(`Creating session for agentforce ID ${agentId}...`);
+    const sessionRequestBody = {
+        externalSessionKey: randomUUID(),
+        instanceConfig: {
+            endpoint: `https://${tokenUrl}`
+        },
+        streamingCapabilities: {
+            chunkTypes: ["Text"]
+        },
+        bypassUser: true,
+        variables: [
+            {
+              name: "$Context.CustomerIdentifier",
+              type: "Text",
+              value: customerIdentifier
+            }
+          ]
+    };
+    const sessionPostData = JSON.stringify(sessionRequestBody);
+    const sessionOptions = {
+        hostname: 'api.salesforce.com',
+        path: `/einstein/ai-agent/v1/agents/${agentId}/sessions`,
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Length': Buffer.byteLength(sessionPostData),
+        }
+    };
+    const sessionResponse = await makeRequest(sessionOptions, sessionPostData);
+    console.log("Successfully created agent session | sessionResponse:" + JSON.stringify(sessionResponse));
+
+    return sessionResponse;
+};
+
+const sendAgentMessage = async (accessToken, sessionId, messageText, customerIdentifier, sequenceId) => {
+    console.log(`Sending message to session ID ${sessionId}...`);
+
+    const messageRequestBody = {
+        message: {
+            sequenceId: sequenceId,
+            type: "Text",
+            text: messageText,
+        }
+    };
+    const messagePostData = JSON.stringify(messageRequestBody);
+    const messageOptions = {
+        hostname: 'api.salesforce.com',
+        path: `/einstein/ai-agent/v1/sessions/${sessionId}/messages`,
+        method: 'POST',
+        headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Length': Buffer.byteLength(messagePostData),
+        }
+    };
+
+//    console.log("Message options: " + JSON.stringify(messageOptions));
+
+    const messageResponse = await makeRequest(messageOptions, messagePostData);
+    console.log("Successfully sent message.");
+    return messageResponse;
+};
+
+export const handler = async (event) => {
+
+    console.log(event);
+    var sessionId = null;
+    var accessToken = null;
+    var lexResponse = null;
+    var messageResponse = null;
+    var customerIdentifier = 0;
+    var sequenceId = 1;
+
+    var whatsappResponse = JSON.stringify({
+        "templateType": "WhatsAppInteractiveReplyButton",
+        "version": "1.0",
+        "data": {
+          "content": {
+            "title": "What would you like to do?",
+            "body": {
+              "text": "Did this answer your question?"
+            },
+            "action": {
+              "buttons": [
+                {
+                  "type": "reply",
+                  "reply": {
+                    "id": "end_chat",
+                    "title": "Yes"
+                  }
+                },
+                {
+                    "type": "reply",
+                    "reply": {
+                      "id": "new_question",
+                      "title": "No"
+                    }
+                  },      
+                  {
+                    "type": "reply",
+                    "reply": {
+                      "id": "agent",
+                      "title": "Human"
+                    }
+                  }
+                ]
+            }
+          }
+        }
+      });
+
+    if (event.sessionState && event.sessionState.sessionAttributes && event.sessionState.sessionAttributes.accessToken) {
+        accessToken = event.sessionState.sessionAttributes.accessToken;
+        console.log("Access Token found in session attributes");
+    }
+    else {
+        console.log("Access Token not found in session attributes");
+    }
+
+    if (event.sessionState && event.sessionState.sessionAttributes && event.sessionState.sessionAttributes.sessionId) {
+        sessionId = event.sessionState.sessionAttributes.sessionId;
+        console.log("SessionId found in session attributes");
+    }
+    else {
+        console.log("SessionId not found in session attributes");
+    }
+
+    if (event.Details && event.Details.Parameters && event.Details.Parameters.customerIdentifier) {
+        customerIdentifier = event.Details.Parameters.customerIdentifier;
+        console.log("CustomerIdentifier found in session attributes");
+    }
+    else {
+        console.log("CustomerIdentifier not found in session attributes");
+    }
+
+    if (event.sessionState && event.sessionState.sessionAttributes && event.sessionState.sessionAttributes.sequenceId) {
+        sequenceId = event.sessionState.sessionAttributes.sequenceId;
+        console.log("SequenceId found in session attributes");
+    }
+    else {
+        console.log("SequenceId not found in session attributes");
+    }
+
+    if (event.sessionState && event.sessionState.sessionAttributes) 
+    {
+        console.log("Existing conversation");
+
+        try {
+
+            console.log("Session Attributes: " + JSON.stringify(event.sessionState.sessionAttributes));
+            
+            const messageText = event.inputTranscript;
+            console.log("Input Transcript: " + messageText);
+
+            console.log("Using existing sessionId: " + sessionId);
+            var agentResponse = await sendAgentMessage(accessToken, sessionId, messageText, customerIdentifier, sequenceId);
+
+            messageResponse = agentResponse.messages[0];    
+
+            console.log("Agent Response: " + messageResponse.message);
+
+            lexResponse = {
+                sessionState: {
+                    dialogAction: {
+                        type: "ElicitIntent",
+                    },
+                    intent: {
+                        name: "FallbackIntent",
+                        state: "InProgress",
+                    },
+                    sessionAttributes: {
+                        accessToken: accessToken,
+                        sessionId: sessionId
+                    }
+                },
+                messages: [
+                    {
+                        contentType: "PlainText",
+                        content: messageResponse.message,
+                    }/*,
+                    {
+                        contentType: "CustomPayload",
+                        content: whatsappResponse
+                    }  */          
+                ],
+            };
+            console.log("Lex Response: " + JSON.stringify(lexResponse));
+            return lexResponse;
+
+        } catch (error) {
+            console.error("Lambda execution failed:", error.message);
+            return {
+                statusCode: 500,
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    message: "An error occurred during the process.",
+                    error: error.message,
+                }),
+            };
+        }
+    }        
+        
+    else
+    {
+        console.log("New conversation");
+
+        try {
+            accessToken = await getSalesforceAccessToken();
+
+            const sessionResponse = await createAgentSession(accessToken, customerIdentifier);
+
+            console.log("Session Response: " + JSON.stringify(sessionResponse));
+
+            sessionId = sessionResponse.sessionId;
+            console.log("Setting Session ID: " + sessionId);
+
+            messageResponse = sessionResponse.messages[0];    
+
+            console.log("Message Response: " + messageResponse.message);
+
+            lexResponse = {
+                accessToken: accessToken,
+                sessionId: sessionId,
+                messageResponse: messageResponse.message
+            };
+            return lexResponse;
+    
+        } catch (error) {
+            console.error("Lambda execution failed:", error.message);
+            return {
+                statusCode: 500,
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    message: "An error occurred during the process.",
+                    error: error.message,
+                }),
+            };
+        }
+
+    }     
+};

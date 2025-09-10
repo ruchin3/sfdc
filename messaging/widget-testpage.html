@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Messaging Test Page</title>
+    <!-- Tailwind CSS CDN for easy styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom font for a clean look */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen flex items-center justify-center p-4">
+
+    <div class="bg-white p-8 rounded-xl shadow-2xl max-w-md w-full text-center border border-blue-200">
+        <!-- Main Heading -->
+        <h2>
+            Messaging Test Page
+		</h2>
+    </div>
+
+<script type='text/javascript'>
+
+	function initEmbeddedMessaging() {
+		console.log('Initiating messaging');
+		try {
+			embeddedservice_bootstrap.settings.language = 'en'; // For example, enter 'en' or 'en-US'
+
+			embeddedservice_bootstrap.init(
+				'<salesforce Org ID>',
+				'Web_Messaging',
+				'<Web_Messaging Custom Domain + Path>', //From Setup > Sites > Web_Messaging
+				{
+					scrt2URL: '<SCRT URL>' //Replace with actual URL from Setup > Embedded Service Deployments > Web_Messaging > Code Snippet
+				}
+				);
+		} catch (err) {
+			console.error('Error loading Embedded Messaging: ', err);
+		}
+	}
+	
+    window.addEventListener("onEmbeddedMessagingButtonCreated", function() {
+            console.log("Launching chat...");
+            embeddedservice_bootstrap.utilAPI.launchChat(); //This function auto launches the chat widget on page load
+    }, { once: true}); //This dictates that it only launches once
+	
+		
+</script>
+<script type='text/javascript' src='<Replace with actual URL from Setup > Embedded Service Deployments > Web_Messaging > Code Snippet>' onload='initEmbeddedMessaging()'></script>
+
+
+</body>
+</html>

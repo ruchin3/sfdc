@@ -1,0 +1,17 @@
+{
+  "name": "create-agent-work-v1",
+  "version": "1.0.0",
+  "description": "AWS Lambda function to call Salesforce API with JWT authentication and execute SOQL queries",
+  "main": "index.mjs",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {},
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "author": "",
+  "license": "ISC"
+}
+

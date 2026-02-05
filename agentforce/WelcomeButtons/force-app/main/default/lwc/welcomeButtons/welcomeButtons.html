@@ -1,0 +1,38 @@
+<template>
+    <div class="container">
+        <lightning-card title="Quick Replies" icon-name="utility:chat">
+            <div class="slds-p-around_small slds-grid slds-wrap slds-grid_pull-padded">
+                <div class="slds-col slds-size_1-of-1 slds-p-around_x-small">
+                    <lightning-button
+                        label="Hello"
+                        variant="brand-outline"
+                        onclick={handleHello}
+                        class="slds-m-right_x-small"
+                    ></lightning-button>
+                    <lightning-button
+                        label="Need Help"
+                        variant="neutral"
+                        onclick={handleNeedHelp}
+                        class="slds-m-right_x-small"
+                    ></lightning-button>
+                    <lightning-button
+                        label="Talk to Agent"
+                        variant="destructive-text"
+                        onclick={handleTalkToAgent}
+                        class="slds-m-right_x-small"
+                    ></lightning-button>
+                    <lightning-button
+                        label="Thanks"
+                        variant="success"
+                        onclick={handleThanks}
+                    ></lightning-button>
+                </div>
+                <template if:true={lastStatus}>
+                    <div class="slds-col slds-size_1-of-1 slds-p-around_x-small slds-text-color_weak slds-text-body_small">
+                        {lastStatus}
+                    </div>
+                </template>
+            </div>
+        </lightning-card>
+    </div>
+</template>

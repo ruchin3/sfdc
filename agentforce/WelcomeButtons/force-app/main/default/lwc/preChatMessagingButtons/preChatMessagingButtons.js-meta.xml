@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<LightningComponentBundle xmlns="http://soap.sforce.com/2006/04/metadata" fqn="preChatMessagingButtons">
+    <apiVersion>60.0</apiVersion>
+    <isExposed>true</isExposed>
+    <masterLabel>Pre-Chat Messaging Buttons</masterLabel>
+    <description>Displays 4 quick-reply buttons that insert text into an Embedded Web Messaging conversation during pre-chat. See README.md for usage instructions.</description>
+    <targets>
+        <target>lightningSnapin__MessagingPreChat</target>
+    </targets>
+</LightningComponentBundle>

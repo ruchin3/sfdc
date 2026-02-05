@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Text Message Bubble Demo</title>
+    <style>
+        /* Include the component's CSS */
+        :host {
+            display: block;
+            
+            /* Theming variables for CTA buttons (used by utility classes below) */
+            --tmb-btn-bg: #f3f3f3;
+            --tmb-btn-color: #2e2e2e;
+            --tmb-btn-border: transparent;
+            --tmb-btn-radius: 8px;
+            --tmb-btn-font-size: 0.875rem; /* 14px */
+            --tmb-btn-font-weight: 600;
+            --tmb-btn-padding-y: 0.375rem;
+            --tmb-btn-padding-x: 0.75rem;
+        }
+        
+        .Agent,
+        .Chatbot {
+            color: #2E2E2E;
+            background-color: #F3F3F3;
+            border-radius: 10px 10px 10px 0;
+            float: left;
+            padding: 0.5em;
+        }
+        
+        .EndUser {
+            background-color: #7967C8;
+            color: #FFFFFF;
+            margin-left: auto;
+            padding: 0.5em;
+            border-radius: 10px 10px 0 10px;
+        }
+        
+        lightning-formatted-text {
+            font-size: 0.8em;
+        }
+        
+        /* CTA container alignment (optional helpers) */
+        .cta-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+        
+        /* Base class to style format buttons inside the bubble
+           Note: lightning-button renders a native button inside shadow DOM;
+           these utilities are intended for elements you render or wrapper classes
+           you add around the buttons using class attribute on lightning-button.
+        */
+        .tmb-btn {
+            background: var(--tmb-btn-bg);
+            color: var(--tmb-btn-color);
+            border: 1px solid var(--tmb-btn-border);
+            border-radius: var(--tmb-btn-radius);
+            font-size: var(--tmb-btn-font-size);
+            font-weight: var(--tmb-btn-font-weight);
+            padding: var(--tmb-btn-padding-y) var(--tmb-btn-padding-x);
+            line-height: 1.2;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.375rem;
+            user-select: none;
+            white-space: nowrap;
+        }
+        
+        /* Size options */
+        .tmb-btn--xs {
+            --tmb-btn-font-size: 0.75rem;
+            --tmb-btn-padding-y: 0.25rem;
+            --tmb-btn-padding-x: 0.5rem;
+            --tmb-btn-radius: 6px;
+        }
+        
+        .tmb-btn--sm {
+            --tmb-btn-font-size: 0.8125rem;
+            --tmb-btn-padding-y: 0.3125rem;
+            --tmb-btn-padding-x: 0.625rem;
+        }
+        
+        .tmb-btn--lg {
+            --tmb-btn-font-size: 1rem;
+            --tmb-btn-padding-y: 0.5rem;
+            --tmb-btn-padding-x: 1rem;
+            --tmb-btn-radius: 10px;
+        }
+        
+        /* Background (solid) options */
+        .tmb-bg--primary   { --tmb-btn-bg: #0176d3; --tmb-btn-color: #ffffff; --tmb-btn-border: #0176d3; }
+        .tmb-bg--neutral   { --tmb-btn-bg: #f3f3f3; --tmb-btn-color: #2e2e2e; --tmb-btn-border: #c9c9c9; }
+        .tmb-bg--success   { --tmb-btn-bg: #2e844a; --tmb-btn-color: #ffffff; --tmb-btn-border: #2e844a; }
+        .tmb-bg--warning   { --tmb-btn-bg: #ffb75d; --tmb-btn-color: #1f1f1f; --tmb-btn-border: #ffb75d; }
+        .tmb-bg--danger    { --tmb-btn-bg: #ba0517; --tmb-btn-color: #ffffff; --tmb-btn-border: #ba0517; }
+        .tmb-bg--info      { --tmb-btn-bg: #32b6ff; --tmb-btn-color: #08263a; --tmb-btn-border: #32b6ff; }
+        .tmb-bg--inverse   { --tmb-btn-bg: #181818; --tmb-btn-color: #ffffff; --tmb-btn-border: #181818; }
+        
+        /* Font options */
+        .tmb-font--sans { font-family: "Salesforce Sans", Arial, Helvetica, sans-serif; }
+        .tmb-font--serif { font-family: Georgia, "Times New Roman", serif; }
+        .tmb-font--mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+        .tmb-weight--normal { --tmb-btn-font-weight: 400; }
+        .tmb-weight--semibold { --tmb-btn-font-weight: 600; }
+        .tmb-weight--bold { --tmb-btn-font-weight: 700; }
+        .tmb-italic { font-style: italic; }
+        .tmb-uppercase { text-transform: uppercase; letter-spacing: 0.02em; }
+        
+        /* Shape options */
+        .tmb-shape--square { --tmb-btn-radius: 0px; }
+        .tmb-shape--rounded-sm { --tmb-btn-radius: 6px; }
+        .tmb-shape--rounded { --tmb-btn-radius: 8px; }
+        .tmb-shape--pill { --tmb-btn-radius: 9999px; }
+        .tmb-shape--circle {
+            --tmb-btn-radius: 9999px;
+            /* For circular icon-only buttons, enforce equal width/height via size utilities */
+        }
+        
+        /* Hover/active feedback */
+        .tmb-btn:hover {
+            filter: brightness(0.98);
+        }
+        .tmb-btn:active {
+            transform: translateY(1px);
+        }
+        
+        /* Disabled state helper */
+        .tmb-disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+        
+        /* Demo styles */
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .demo-container {
+            margin-bottom: 30px;
+        }
+        
+        h2 {
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        
+        .message-bubble {
+            padding: 10px;
+            margin-bottom: 10px;
+            max-width: 60%;
+        }
+        
+        .end-user-bubble {
+            background-color: #7967C8;
+            color: #FFFFFF;
+            margin-left: auto;
+            border-radius: 10px 10px 0 10px;
+        }
+        
+        .agent-bubble {
+            background-color: #F3F3F3;
+            color: #2E2E2E;
+            border-radius: 10px 10px 10px 0;
+            float: left;
+        }
+        
+        .chatbot-bubble {
+            background-color: #F3F3F3;
+            color: #2E2E2E;
+            border-radius: 10px 10px 10px 0;
+            float: left;
+        }
+        
+        .cta-buttons {
+            margin-top: 10px;
+        }
+        
+        .cta-buttons button {
+            margin-right: 5px;
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Text Message Bubble Component Demo</h1>
+    
+    <div class="demo-container">
+        <h2>End User Message (with CTAs)</h2>
+        <div class="message-bubble end-user-bubble">
+            <p>This is an <strong>important</strong> message with <a href="#">a link</a>.</p>
+            <div class="cta-buttons">
+                <button class="tmb-btn tmb-bg--neutral">Locations</button>
+                <button class="tmb-btn tmb-bg--neutral">Services</button>
+                <button class="tmb-btn tmb-bg--neutral">Appointments</button>
+                <button class="tmb-btn tmb-bg--neutral">Accounts</button>
+                <button class="tmb-btn tmb-bg--neutral">Results</button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="demo-container">
+        <h2>Agent Message (without CTAs)</h2>
+        <div class="message-bubble agent-bubble">
+            <p>Hello! How can I help you today?</p>
+        </div>
+    </div>
+    
+    <div class="demo-container">
+        <h2>Chatbot Message (with CTAs)</h2>
+        <div class="message-bubble chatbot-bubble">
+            <p>Welcome! What would you like to do?</p>
+            <div class="cta-buttons">
+                <button class="tmb-btn tmb-bg--neutral">Locations</button>
+                <button class="tmb-btn tmb-bg--neutral">Services</button>
+                <button class="tmb-btn tmb-bg--neutral">Appointments</button>
+                <button class="tmb-btn tmb-bg--neutral">Accounts</button>
+                <button class="tmb-btn tmb-bg--neutral">Results</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Simple script to simulate button clicks
+        document.querySelectorAll('.cta-buttons button').forEach(button => {
+            button.addEventListener('click', function() {
+                alert('Button clicked: ' + this.textContent);
+            });
+        });
+    </script>
+</body>
+</html>

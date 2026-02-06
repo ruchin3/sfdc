@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Package xmlns="http://soap.sforce.com/2006/04/metadata">
+    <types>
+        <members>buttonComponent</members>
+        <name>LightningComponentBundle</name>
+    </types>
+    <types>
+        <members>Send_Welcome_Buttons_on_Chat_Start</members>
+        <name>Flow</name>
+    </types>
+    <version>59.0</version>
+</Package>

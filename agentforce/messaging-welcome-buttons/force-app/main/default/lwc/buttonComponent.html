@@ -1,0 +1,15 @@
+<template>
+    <div class="slds-p-around_small button-container">
+        <template for:each={buttons} for:item="button">
+            <div key={button.value} class="slds-m-bottom_x-small">
+                <lightning-button
+                    label={button.label}
+                    value={button.value}
+                    onclick={handleClick}
+                    variant="brand"
+                    class="slds-button slds-button_stretch">
+                </lightning-button>
+            </div>
+        </template>
+    </div>
+</template>

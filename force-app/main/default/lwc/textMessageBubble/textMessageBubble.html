@@ -1,0 +1,58 @@
+<template>
+  <!-- First bubble: message text + first button set (group-menu if present) -->
+  <div class={generateMessageBubbleClassname}>
+    <lightning-formatted-rich-text value={textContent}></lightning-formatted-rich-text>
+
+    <!-- Render the first button set inside the same bubble as text -->
+    <template if:true={showCtas}>
+      <template for:each={ctaGroups} for:item="group">
+        <template if:true={group.isFirst}>
+          <div key={group.id} class="cta-group" style="margin-top: 0.5rem;">
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+              <template for:each={group.buttons} for:item="btn">
+                <button
+                  key={btn.label}
+                  class="tmb-btn tmb-btn--xs tmb-bg--primary"
+                  data-value={btn.value}
+                  onclick={handleButtonClick}
+                  type="button">
+                  {btn.label}
+                </button>
+              </template>
+            </div>
+          </div>
+        </template>
+      </template>
+    </template>
+  </div>
+
+  <!-- Second bubble(s): remaining CTA groups rendered as separate bubbles -->
+  <template if:true={showCtas}>
+    <template for:each={ctaGroups} for:item="group">
+      <template if:false={group.isFirst}>
+        <div key={group.id} class={generateMessageBubbleClassname}>
+          <!-- Optional fixed text coming from JS (group.prefaceText) -->
+          <template if:true={group.prefaceText}>
+            <div style="margin-bottom: 0.5rem;">
+              <lightning-formatted-rich-text value={group.prefaceText}></lightning-formatted-rich-text>
+            </div>
+          </template>
+          <div class="cta-group" style="margin-top: 0.5rem;">
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+              <template for:each={group.buttons} for:item="btn">
+                <button
+                  key={btn.label}
+                  class="tmb-btn tmb-btn--xs tmb-bg--primary"
+                  data-value={btn.value}
+                  onclick={handleButtonClick}
+                  type="button">
+                  {btn.label}
+                </button>
+              </template>
+            </div>
+          </div>
+        </div>
+      </template>
+    </template>
+  </template>
+</template>
